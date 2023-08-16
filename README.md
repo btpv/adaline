@@ -5,3 +5,5 @@ The aim of the project is to encourage educators to build their own devices to h
 perhaps among Schools and Colleges.
 
 Here is a video demonstrating how to train the device: https://youtu.be/PBz0Q8OuVuk
+
+Here is a link to a video (from 2012) featuring Prof Bernard Widrow demonstrating his original work on Adaline: https://youtu.be/hc2Zj55j1zU and Part 2: https://youtu.be/skfNlwEbqck
