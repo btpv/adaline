@@ -118,7 +118,8 @@ void loop() {
   sig = tanh(2*out);  // Sigmoid output function (2*) to get closer to +/-1
   lcd.setCursor(0, 0);  // Position cursor at 0,0 on LCD
   lcd.print("Sig = ");  // Print "Sig = " on LCD
-  lcd.print(sig);
+  lcd.print(sig);     //  Print Sig value
+  lcd.print("  ");  // Print some blank spaces to clear any old digits
   if(sig>0){
     lcd.setPWM(REG_BLUE, abs(int(sig*125))+125);  // Set LCD background to Blue if output is positive
     lcd.setPWM(REG_RED, 0);
