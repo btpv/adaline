@@ -6,4 +6,4 @@ perhaps among Schools and Colleges.
 
 Here is a video demonstrating how to train the device: https://youtu.be/PBz0Q8OuVuk
 
-Here is a link to a video (from 2012) featuring Prof Bernard Widrow demonstrating his original work on Adaline: https://youtu.be/hc2Zj55j1zU and Part 2: https://youtu.be/skfNlwEbqck
+Here is a link to a video (from 2012) which inspired this project.  It features none other than Prof Bernard Widrow himself demonstrating his Adaline device: https://youtu.be/hc2Zj55j1zU and Part 2: https://youtu.be/skfNlwEbqck
