@@ -4,14 +4,17 @@ Using Neo-pixels to demonstrate the Widrow-Hoff Adaline (LMS) algorithm
 for the Arduino to learn.
 */
 
-#include "Adafruit_NeoTrellis.h"
-#include "Arduino.h"
 #include <Wire.h>
-#include "rgb_lcd.h"
+#include <Arduino.h>
+#include <rgb_lcd.h>
+#include <Adafruit_NeoTrellis.h>
+#include <U8x8lib.h>
 
+
+U8X8_SSD1306_128X64_NONAME_HW_I2C display(-1);
 rgb_lcd lcd;
-
 Adafruit_NeoTrellis trellis;  // Initialise NeoTrellis
+
 
 float I[17] = { -1,-1,-1,-1,  // Input array (augmented)
              -1,-1,-1,-1,
@@ -58,18 +61,32 @@ void update() {
 // Main loop of prgram
 
 void setup() {
-  lcd.begin(16, 2);  // set up the LCD's number of columns and rows:
-  lcd.setRGB(255, 0, 0);  // Set green backlight off
   Serial.begin(9600);  // Setup the serial port
+  Wire.begin();
+  Serial.println("\nI2C devices found:");
+  for (uint8_t i = 1; i < 127; i++) {
+    Wire.beginTransmission(i);
+    if (Wire.endTransmission() == 0) {
+      Serial.print("0x");
+      Serial.print(i, HEX);
+      Serial.println(" ");
+    }
+  }
   pinMode(2, INPUT_PULLUP);  // Setup digital input as a pull-up type
   pinMode(3, INPUT_PULLUP);  // Setup digital input as a pull-up type
-  if (!trellis.begin()) {
+  if (!display.begin()) {
+    Serial.println(F("SSD1306 allocation failed"));
+    for (;;); // Don't proceed, loop forever
+  }
+  lcd.begin(16, 2);  // set up the LCD's number of columns and rows:
+  lcd.setRGB(255, 0, 0);  // Set green backlight off
+  if (!trellis.begin(0x2E)) {
     Serial.println("Could not start trellis, check wiring?");
     while (1) delay(1);
   } else {
     Serial.println("NeoPixel Trellis started");
   }
-
+  display.display();
   //activate all keys and set callbacks
   for (int i = 0; i < NEO_TRELLIS_NUM_KEYS; i++) {
     trellis.activateKey(i, SEESAW_KEYPAD_EDGE_RISING);
@@ -85,6 +102,7 @@ void setup() {
   for (int i = 0; i < NEO_TRELLIS_NUM_KEYS + 1; i++) {
     W[i] = random(-100, 100) / 100;     // random values between -1 and +1
   }
+  display.setFont(u8x8_font_chroma48medium8_r);
 }
 
 void loop() {
@@ -100,11 +118,16 @@ void loop() {
     update();
   }
   output();           // Compute output of neuron
+  for (int x = 0; x < 4; x++) {
+    for (int y = 0; y < 4; y++) {
+      display.drawString(x * 4, y, ([](int x, int y) { static char b[6]; sprintf(b, "%4d", (int)(W[x * 4 + y] * 100)); return b; })(x, y));
+    }
+  }
   sig = tanh(2 * out);  // Sigmoid output function (2*) to get closer to +/-1
   lcd.setCursor(0, 0);  // Position cursor at 0,0 on LCD
   lcd.print("Sig = ");  // Print "Sig = " on LCD
   lcd.print(sig);     //  Print Sig value
   lcd.print("  ");  // Print some blank spaces to clear any old digits
-  lcd.setRGB((sig < 0) ? int(pow(-sig,3) * 245) + 10 : 0, (sig == 0) ? 255 : 0, (sig > 0) ? int(pow(sig,3) * 245) + 10 : 0);
+  lcd.setRGB((sig < 0) ? int(pow(-sig, 3) * 245) + 10 : 0, (sig == 0) ? 255 : 0, (sig > 0) ? int(pow(sig, 3) * 245) + 10 : 0);
   delay(50); // Introduce small delay to slow the update cycle to be visible on LCD
 }
