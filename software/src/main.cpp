@@ -1,9 +1,3 @@
-/**
-Using Neo-pixels to demonstrate the Widrow-Hoff Adaline (LMS) algorithm
-16 Neo-pixels in a 4x4 array connected to a 4x4 keypad used to set up patterns
-for the Arduino to learn.
-*/
-
 #include <Wire.h>
 #include <Arduino.h>
 #include <rgb_lcd.h>
@@ -13,57 +7,115 @@ for the Arduino to learn.
 
 U8X8_SSD1306_128X64_NONAME_HW_I2C display(-1);
 rgb_lcd lcd;
-Adafruit_NeoTrellis trellis;  // Initialise NeoTrellis
+Adafruit_NeoTrellis trellis;
 
 
-float I[17] = { -1,-1,-1,-1,  // Input array (augmented)
+double I[17] = { -1,-1,-1,-1,
              -1,-1,-1,-1,
              -1,-1,-1,-1,
              -1,-1,-1,-1, 1 };
-float W[17];      // Weight array (augmented)
-float mu = 0.002; // Learning rate variable
-float out = 0;    // Output variable
-float sig = 0;    // Sigmoid output
-float err = 0;    // Error value
-float des = 0;    // Desired value +1 or -1
+double W[17];
+double mu = 0.002;
+double sig = 0;
+double err = 0;
+double des = 0;
 
+void scanI2C();
+void setLed(uint16_t i);
+TrellisCallback btnPress(keyEvent evt);
+void update(double out);
+double output();
+void printLcd(double out);
+
+
+void setup() {
+  Serial.begin(9600);
+  scanI2C();
+  pinMode(2, INPUT_PULLUP);
+  pinMode(3, INPUT_PULLUP);
+  if (!display.begin()) {
+    Serial.println("SSD1306 fialed to initialize");
+    for (;;);
+  } else {
+    Serial.println("SSD1306 initialized");
+  }
+  lcd.begin(16, 2);
+  lcd.setRGB(255, 0, 0);
+  Serial.println("LCD initialized");
+  if (!trellis.begin(0x2E)) {
+    Serial.println("Could not start trellis, check wiring?");
+    for (;;);
+  } else {
+    Serial.println("NeoPixel Trellis started");
+  }
+  display.setFont(u8x8_font_chroma48medium8_r);
+  display.display();
+
+  for (int i = 0; i < NEO_TRELLIS_NUM_KEYS; i++) {
+    trellis.activateKey(i, SEESAW_KEYPAD_EDGE_RISING);
+    trellis.registerCallback(i, btnPress);
+    setLed(i);
+    delay(50);
+  }
+  randomSeed(analogRead(0));
+  for (int i = 0; i < NEO_TRELLIS_NUM_KEYS + 1; i++) {
+    W[i] = random(-100, 100) / 100.0;
+  }
+}
+
+void loop() {
+  trellis.read();
+  trellis.pixels.show();
+  double out = output();
+
+  if (digitalRead(3) == false) {
+    des = 1;
+    update(out);
+  }
+  if (digitalRead(2) == false) {
+    des = -1;
+    update(out);
+  }
+  for (int x = 0; x < 4; x++) {
+    for (int y = 0; y < 4; y++) {
+      display.drawString(x * 4, y * 2, ([](int x, int y) { static char b[6]; sprintf(b, "%4d", (int)(W[x * 4 + y] * 100)); return b; })(x, y));
+    }
+  }
+  printLcd(out);
+  delay(50);
+}
 
 void setLed(uint16_t i) {
   trellis.pixels.setPixelColor(i, I[i] == 1 ? 0x000015 : 0x150000);
-  trellis.pixels.show(); // Update the neopixels!
+  trellis.pixels.show();
 }
-//define a callback for key presses
-TrellisCallback toggle(keyEvent evt) {
-  // Check is the pad pressed?
-  I[evt.bit.NUM] = evt.bit.EDGE == SEESAW_KEYPAD_EDGE_RISING && I[evt.bit.NUM] == -1 ? 1 : -1;
+
+TrellisCallback btnPress(keyEvent evt) {
+  if (evt.bit.EDGE == SEESAW_KEYPAD_EDGE_RISING) {
+    I[evt.bit.NUM] *= -1;
+  }
   setLed(evt.bit.NUM);
   delay(5);
   return 0;
 }
 
-
-// compute output result from adaline
-void output() {
-  out = 0;    // reset output variable
+double output() {
+  double out = 0;
   for (int i = 0; i < NEO_TRELLIS_NUM_KEYS + 1; i++) {
-    out = out + W[i] * I[i];     // calculate output of adaline to include bias (augmented vector)
+    out = out + W[i] * I[i];
   }
+  return out;
 }
 
-// select/adjust weights manually
-void update() {
+void update(double out) {
   err = des - out;
   for (int i = 0; i < NEO_TRELLIS_NUM_KEYS + 1; i++) {
-    W[i] = W[i] + 2 * mu * err * I[i];  // update the weight vector using LMS rule
+    W[i] = W[i] + 2 * mu * err * I[i];
   }
 }
 
-// Main loop of prgram
-
-void setup() {
-  Serial.begin(9600);  // Setup the serial port
+void scanI2C() {
   Wire.begin();
-  Serial.println("\nI2C devices found:");
   for (uint8_t i = 1; i < 127; i++) {
     Wire.beginTransmission(i);
     if (Wire.endTransmission() == 0) {
@@ -72,62 +124,19 @@ void setup() {
       Serial.println(" ");
     }
   }
-  pinMode(2, INPUT_PULLUP);  // Setup digital input as a pull-up type
-  pinMode(3, INPUT_PULLUP);  // Setup digital input as a pull-up type
-  if (!display.begin()) {
-    Serial.println(F("SSD1306 allocation failed"));
-    for (;;); // Don't proceed, loop forever
-  }
-  lcd.begin(16, 2);  // set up the LCD's number of columns and rows:
-  lcd.setRGB(255, 0, 0);  // Set green backlight off
-  if (!trellis.begin(0x2E)) {
-    Serial.println("Could not start trellis, check wiring?");
-    while (1) delay(1);
-  } else {
-    Serial.println("NeoPixel Trellis started");
-  }
-  display.display();
-  //activate all keys and set callbacks
-  for (int i = 0; i < NEO_TRELLIS_NUM_KEYS; i++) {
-    trellis.activateKey(i, SEESAW_KEYPAD_EDGE_RISING);
-    trellis.registerCallback(i, toggle);
-  }
-
-  //show initial blank pattern
-  for (uint16_t i = 0; i < trellis.pixels.numPixels(); i++) {
-    setLed(i);
-    delay(50);   // Slight delay in illuminating pattern
-  }
-  // initialise W with random values
-  for (int i = 0; i < NEO_TRELLIS_NUM_KEYS + 1; i++) {
-    W[i] = random(-100, 100) / 100;     // random values between -1 and +1
-  }
-  display.setFont(u8x8_font_chroma48medium8_r);
 }
 
-void loop() {
-  trellis.read();  // interrupt management does all the work! :)
-  trellis.pixels.show();
-
-  if (digitalRead(3) == false) { // Read input pin 'plus'
-    des = 1;
-    update();
+void printLcd(double out) {
+  double sig = tanh(2 * out);
+  lcd.setCursor(0, 0);
+  lcd.print("Sig = ");
+  lcd.print(sig);
+  lcd.print("  ");
+  if (sig < 0) {
+    lcd.setRGB(int(pow(-sig, 4) * 245) + 10, 0, 0);
+  } else if (sig > 0) {
+    lcd.setRGB(0, 0, int(pow(sig, 4) * 245) + 10);
+  } else {
+    lcd.setRGB(0, 255, 0);
   }
-  if (digitalRead(2) == false) { // Read input pin 'minus'
-    des = -1;
-    update();
-  }
-  output();           // Compute output of neuron
-  for (int x = 0; x < 4; x++) {
-    for (int y = 0; y < 4; y++) {
-      display.drawString(x * 4, y, ([](int x, int y) { static char b[6]; sprintf(b, "%4d", (int)(W[x * 4 + y] * 100)); return b; })(x, y));
-    }
-  }
-  sig = tanh(2 * out);  // Sigmoid output function (2*) to get closer to +/-1
-  lcd.setCursor(0, 0);  // Position cursor at 0,0 on LCD
-  lcd.print("Sig = ");  // Print "Sig = " on LCD
-  lcd.print(sig);     //  Print Sig value
-  lcd.print("  ");  // Print some blank spaces to clear any old digits
-  lcd.setRGB((sig < 0) ? int(pow(-sig, 3) * 245) + 10 : 0, (sig == 0) ? 255 : 0, (sig > 0) ? int(pow(sig, 3) * 245) + 10 : 0);
-  delay(50); // Introduce small delay to slow the update cycle to be visible on LCD
 }
